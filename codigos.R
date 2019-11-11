@@ -10,6 +10,8 @@
 # Se os pacotes necessários não estiverem instalados, faça a instalação
 if (!require(tidyverse)) install.packages("tidyverse")
 if (!require(ISLR)) install.packages("ISLR")
+if (!require(titanic)) install.packages("titanic")
+if (!require(pROC)) install.packages("pROC")
 if (!require(texreg)) install.packages("texreg")
 if (!require(splines)) install.packages("splines")
 if (!require(gam)) install.packages("gam")
@@ -19,6 +21,8 @@ if (!require(randomForest)) install.packages("randomForest")
 # Carrega os pacotes necessários
 library(tidyverse)
 library(ISLR)
+library(titanic)
+library(pROC)
 library(texreg)
 library(gam)
 library(tree)
@@ -67,6 +71,18 @@ head(adv)
 novosdados = tibble(TV=50, radio=10, newspaper=15)
 predict(reg_completa, newdata = novosdados)
 
+# A Abordagem de treino e teste
+set.seed(123)
+train = sample(nrow(adv), nrow(adv)*.7)
+reg_completa = lm(sales ~ TV + radio + newspaper, data = adv[train,])
+
+# RMSE de treino
+yhat_treino = predict(reg_completa)
+sqrt(mean((adv$sales[train] - yhat_treino)^2))
+
+# RMSE de teste
+yhat_teste = predict(reg_completa, newdata = adv[-train, ])
+sqrt(mean((adv$sales[-train] - yhat_teste)^2))
 
 ###########################
 # Métodos não-lineares ####
@@ -177,3 +193,40 @@ r2_score(Wage$wage, predict(fit2, Wage$age)$y)
 
 rmse(Wage$wage, predict(fit.3))
 rmse(Wage$wage, predict(fit2, Wage$age)$y)
+
+##########################
+# Regressão Logística ####
+##########################
+#
+
+data("titanic_train")
+tt = titanic_train %>% as_tibble()
+tt
+
+# Investigando as chances de sobrevivência no titanic
+train = sample(nrow(tt), nrow(tt)*.6)
+
+logit = glm(Survived ~ Age + Sex + factor(Pclass), data = tt[train,],
+            family = binomial())
+
+summary(logit)
+
+# Testando o ajuste
+# Confusion matrix
+yhat_train = round(predict(logit, tt[train,], type='response'))
+table(tt$Survived[train], yhat_train)
+
+# erro de teste
+yhat_test = round(predict(logit, tt[-train,], type='response'))
+table(tt$Survived[-train], yhat_test)
+
+roc(tt$Survived[train], predict(logit, tt[train,], type='response'), 
+    plot = T, main='Train ROC')
+
+roc(tt$Survived[-train], predict(logit, tt[-train,], type='response'), 
+    plot = T, main='Test ROC')
+
+
+# Prevendo a minha probabilidade de sobrevivência no Titanic
+eu = tibble(Age=32, Sex='male', Pclass=3)
+predict(logit, newdata = eu, type='response')
