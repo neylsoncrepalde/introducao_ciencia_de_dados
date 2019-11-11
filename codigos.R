@@ -27,6 +27,7 @@ library(texreg)
 library(gam)
 library(tree)
 library(randomForest)
+library(MASS)
 
 # Carrega os dados Advertisement
 adv = read_csv("http://faculty.marshall.usc.edu/gareth-james/ISL/Advertising.csv") %>% 
@@ -230,3 +231,66 @@ roc(tt$Survived[-train], predict(logit, tt[-train,], type='response'),
 # Prevendo a minha probabilidade de sobrevivência no Titanic
 eu = tibble(Age=32, Sex='male', Pclass=3)
 predict(logit, newdata = eu, type='response')
+
+
+#########################
+# Árvores de decisão ####
+#########################
+
+# Decision trees para problemas de classificação ####
+tt$Pclass = as.factor(tt$Pclass)
+tree.tt = tree(Survived ~ Age + Sex + Pclass, tt[train,])
+
+summary(tree.tt)
+plot(tree.tt)
+text(tree.tt, pretty = 1)
+
+yhat_tree = predict(tree.tt, tt[-train,])
+plot(roc(tt$Survived[-train], yhat_tree))
+
+# Decision trees para problemas de regressão ####
+cst = Carseats %>% as_tibble()
+cst
+
+# Variável resposta
+summary(cst$Sales)
+
+train = sample(nrow(cst), nrow(cst)*.6)
+
+tree.cst = tree(Sales ~ ., cst[-train,])
+summary(tree.cst)
+plot(tree.cst)
+text(tree.cst, pretty=0)
+
+yhat_test = predict(tree.cst, cst[-train,])
+
+r2_score(cst$Sales[-train], yhat_test)
+rmse(cst$Sales[-train], yhat_test)
+
+
+# Bagging ####
+set.seed(123)
+
+train = sample(nrow(Boston), nrow(Boston)*.6)
+
+bag.boston = randomForest(medv ~ ., Boston, subset=train,
+                          mtry = dim(Boston)[2]-1, ntree=25,
+                          importance=TRUE)
+bag.boston
+yhat.bag = predict(bag.boston, newdata=Boston[-train,])
+
+# Verifica os valores preditos e observados
+plot(Boston$medv[-train], yhat.bag)
+abline(0,1, col='red')
+
+rmse(Boston$medv[-train], yhat.bag)
+
+# Random Forest ####
+rf.boston = randomForest(medv~., data=Boston,
+                         subset=train, mtry=6, importance=TRUE)
+yhat.rf = predict(rf.boston, newdata=Boston[-train,])
+rmse(Boston$medv[-train], yhat.rf)
+
+# Verificando Feature importances
+importance(rf.boston)
+varImpPlot(rf.boston)
